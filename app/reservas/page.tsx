@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { IoChevronDown, IoClose, IoPencil, IoTrashOutline } from 'react-icons/io5'
 import RangeDatePicker from '@/components/RangeDatePicker'
 
@@ -37,6 +37,8 @@ export default function ReservasPage() {
   const [editDeleting, setEditDeleting] = useState(false)
   const [openFiltro, setOpenFiltro] = useState(false)
   const [propiedadFiltro, setPropiedadFiltro] = useState<string>('Todas')
+  const [fechaIngresoDesde, setFechaIngresoDesde] = useState('')
+  const [fechaIngresoHasta, setFechaIngresoHasta] = useState('')
   const propiedades = Array.from(new Set(reservas.map(r => r.propiedad)))
   const filtroRef = useRef<HTMLDivElement | null>(null)
 
@@ -323,6 +325,15 @@ export default function ReservasPage() {
     }
   }
 
+  const reservasFiltradas = useMemo(() => {
+    return reservas.filter((r) => {
+      if (propiedadFiltro !== 'Todas' && r.propiedad !== propiedadFiltro) return false
+      if (fechaIngresoDesde && r.desde < fechaIngresoDesde) return false
+      if (fechaIngresoHasta && r.desde > fechaIngresoHasta) return false
+      return true
+    })
+  }, [reservas, propiedadFiltro, fechaIngresoDesde, fechaIngresoHasta])
+
   return (
     <main className="min-h-screen bg-black text-white pb-16 md:pb-0">
       <div className="px-4 py-6">
@@ -336,7 +347,7 @@ export default function ReservasPage() {
         </div>
 
         {/* Filtros */}
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
           <div ref={filtroRef} className="relative">
             <button
               type="button"
@@ -367,16 +378,31 @@ export default function ReservasPage() {
               </div>
             )}
           </div>
+          <div className="w-full min-w-[220px] sm:w-[260px]">
+            <RangeDatePicker
+              startDate={fechaIngresoDesde}
+              endDate={fechaIngresoHasta}
+              onChange={(start, end) => {
+                setFechaIngresoDesde(start)
+                setFechaIngresoHasta(end)
+              }}
+              requireBothDates
+              placeholder="Fecha de ingreso"
+              hintStart="Seleccioná desde"
+              hintEnd="Seleccioná hasta"
+              triggerClassName="w-full bg-gray-900/70 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white hover:bg-gray-800 text-left flex items-center justify-between"
+            />
+          </div>
         </div>
 
         {/* Lista de reservas */}
         {loading ? (
           <div className="text-gray-400 text-sm">Cargando...</div>
+        ) : reservasFiltradas.length === 0 ? (
+          <div className="text-gray-400 text-sm">No hay reservas con esos filtros.</div>
         ) : (
         <div className="space-y-4">
-          {reservas
-            .filter((r) => propiedadFiltro === 'Todas' ? true : r.propiedad === propiedadFiltro)
-            .map((reserva) => (
+          {reservasFiltradas.map((reserva) => (
             <div
               key={reserva.id}
               className="bg-gray-900/50 border border-gray-800 rounded-lg p-4"

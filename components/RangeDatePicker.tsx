@@ -18,6 +18,8 @@ interface RangeDatePickerProps {
   minDate?: string
   /** Clases del/los botón(es) disparador(es). */
   triggerClassName?: string
+  hintStart?: string
+  hintEnd?: string
 }
 
 export default function RangeDatePicker({
@@ -31,6 +33,8 @@ export default function RangeDatePicker({
   requireBothDates = false,
   minDate,
   triggerClassName,
+  hintStart = 'Seleccioná la fecha de ingreso',
+  hintEnd = 'Seleccioná la fecha de salida',
 }: RangeDatePickerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [pickMode, setPickMode] = useState<'range' | 'start' | 'end'>('range')
@@ -419,9 +423,9 @@ export default function RangeDatePicker({
                 {requireBothDates && (
                   <p className="text-sm text-gray-400">
                     {!tempStartDate
-                      ? 'Seleccioná la fecha de ingreso'
+                      ? hintStart
                       : !tempEndDate
-                        ? 'Seleccioná la fecha de salida'
+                        ? hintEnd
                         : `${formatDisplayDate(tempStartDate)} - ${formatDisplayDate(tempEndDate)}`}
                   </p>
                 )}
