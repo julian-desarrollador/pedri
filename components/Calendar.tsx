@@ -161,7 +161,7 @@ export default function Calendar({ reservations = {}, onDayClick, onMonthChange,
 
   if (!mounted) {
     return (
-      <div className="bg-black text-white h-[45vh] flex flex-col">
+      <div className="bg-black text-white h-[45vh] overflow-y-auto flex flex-col">
         <div className="flex items-center justify-center h-full">
           <div className="text-gray-400">Cargando...</div>
         </div>
@@ -171,7 +171,7 @@ export default function Calendar({ reservations = {}, onDayClick, onMonthChange,
 
   return (
     <div 
-      className="bg-black text-white h-[45vh] flex flex-col"
+      className="bg-black text-white h-[45vh] overflow-y-auto flex flex-col"
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}

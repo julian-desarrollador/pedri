@@ -88,6 +88,7 @@ export default function Home() {
   const [isAvailabilityModalOpen, setIsAvailabilityModalOpen] = useState(false)
   const { setIsModalOpen: setGlobalModalOpen } = useModal()
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
+  const [mostrarCanceladas, setMostrarCanceladas] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null)
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth())
@@ -235,6 +236,7 @@ export default function Home() {
     setSelectedDay(day)
     setSelectedMonth(currentMonth)
     setSelectedYear(currentYear)
+    setMostrarCanceladas(false)
   }
 
   const handleMonthChange = (month: number, year: number) => {
@@ -257,6 +259,7 @@ export default function Home() {
     let isCheckIn: boolean = true
 
     reservations.forEach((res) => {
+      if (res.estado === 'Cancelada') return
       const checkInDate = new Date(res.checkInYear, res.checkInMonth, res.checkInDay)
       const checkOutDate = new Date(res.checkOutYear, res.checkOutMonth, res.checkOutDay)
 
@@ -409,6 +412,11 @@ export default function Home() {
     }
   }
 
+  const reservasDelDia = selectedDay !== null ? getReservationsForDay(selectedDay) : []
+  const activasDelDia = reservasDelDia.filter((res) => res.estado !== 'Cancelada')
+  const canceladasDelDia = reservasDelDia.filter((res) => res.estado === 'Cancelada')
+  const visiblesDelDia = mostrarCanceladas ? reservasDelDia : activasDelDia
+
   return (
     <main className="min-h-screen bg-black flex flex-col">
       {/* Calendario - 45% de la pantalla */}
@@ -419,6 +427,23 @@ export default function Home() {
         currentMonth={currentMonth}
         currentYear={currentYear}
       />
+
+      {selectedDay !== null && !reservationsLoading && canceladasDelDia.length > 0 && (
+        <div className="px-4 pt-3">
+          <button
+            type="button"
+            onClick={() => setMostrarCanceladas((v) => !v)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+              mostrarCanceladas
+                ? 'border-red-500 bg-red-600 text-white shadow-md shadow-red-900/40'
+                : 'border-gray-800 bg-gray-900/70 font-medium text-gray-300 hover:bg-gray-800'
+            }`}
+            aria-pressed={mostrarCanceladas}
+          >
+            {`Canceladas ${canceladasDelDia.length}`}
+          </button>
+        </div>
+      )}
 
       {/* Área de eventos - 55% restante */}
       <div className="flex-1 bg-black overflow-y-auto px-4 py-4">
@@ -436,29 +461,31 @@ export default function Home() {
               Ver las próximas reservas
             </button>
           </div>
-        ) : getReservationsForDay(selectedDay).length > 0 ? (
-          <div className="space-y-3 pt-6 pb-20 md:pb-4">
-            {getReservationsForDay(selectedDay).map((reservation) => (
-              <ReservationCard
-                key={reservation.id}
-                reservation={reservation}
-                selectedDay={selectedDay}
-                onCancelReservation={handleCancelReservation}
-                onUncancelReservation={handleUncancelReservation}
-              />
-            ))}
-          </div>
         ) : (
-          <div className="text-center py-8">
-            <p className="text-gray-400 text-sm mb-3">
-              Este día no llega ningún cliente
-            </p>
-            <button 
-              onClick={handleViewNextReservations}
-              className="text-blue-500 text-sm font-medium hover:text-blue-400 transition-colors"
-            >
-              Ver las próximas reservas
-            </button>
+          <div className="space-y-3 pt-3 pb-20 md:pb-4">
+            {visiblesDelDia.length > 0 ? (
+              visiblesDelDia.map((reservation) => (
+                <ReservationCard
+                  key={reservation.id}
+                  reservation={reservation}
+                  selectedDay={selectedDay}
+                  onCancelReservation={handleCancelReservation}
+                  onUncancelReservation={handleUncancelReservation}
+                />
+              ))
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-400 text-sm mb-3">
+                  Este día no llega ningún cliente
+                </p>
+                <button
+                  onClick={handleViewNextReservations}
+                  className="text-blue-500 text-sm font-medium hover:text-blue-400 transition-colors"
+                >
+                  Ver las próximas reservas
+                </button>
+              </div>
+            )}
           </div>
         )}
         {reservationsError && <div className="text-xs text-red-400 mt-2">{reservationsError}</div>}
