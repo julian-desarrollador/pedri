@@ -7,6 +7,7 @@ import { ModalProvider } from '@/contexts/ModalContext'
 import BottomNavWrapper from '@/components/BottomNavWrapper'
 import ViewportKeyboard from '@/components/ViewportKeyboard'
 import SideNavWrapper from '@/components/SideNavWrapper'
+import OneTimeNotice from '@/components/OneTimeNotice'
 
 import { Analytics } from '@vercel/analytics/react'
 import { GA_MEASUREMENT_ID } from '@/lib/gtag'
@@ -92,6 +93,7 @@ export default async function RootLayout({
         </div>
       </div>
       <BottomNavWrapper />
+      <OneTimeNotice />
     </>
   )
 
