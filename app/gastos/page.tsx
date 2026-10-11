@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { IoAdd } from 'react-icons/io5'
-import GastoModal from '@/components/GastoModal'
+import { IoAdd, IoPencil } from 'react-icons/io5'
+import GastoModal, { GastoFormValues } from '@/components/GastoModal'
 import { useModal } from '@/contexts/ModalContext'
 
 interface Gasto {
@@ -12,6 +12,47 @@ interface Gasto {
   propiedad: string
   monto: number
   nota?: string
+  moneda: 'ARS' | 'USD'
+}
+
+function humanizeCategoria(c: string) {
+  const x = (c || '').toLowerCase()
+  if (x === 'limpieza') return 'Limpieza'
+  if (x === 'mantenimiento') return 'Mantenimiento'
+  if (x === 'servicios') return 'Servicios'
+  if (x === 'impuestos') return 'Impuestos'
+  return 'Otros'
+}
+
+function mapCategoria(t: string): 'limpieza' | 'mantenimiento' | 'servicios' | 'impuestos' | 'otros' {
+  const norm = (s: string) =>
+    (s || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim()
+  const m = norm(t)
+  if (m.includes('limpieza')) return 'limpieza'
+  if (m.includes('reparac') || m.includes('mantenimiento')) return 'mantenimiento'
+  if (m.includes('wifi') || m.includes('cable') || m.includes('servicio')) return 'servicios'
+  if (m.includes('impuesto')) return 'impuestos'
+  if (m.includes('comision') && m.includes('plataforma')) return 'servicios'
+  return 'otros'
+}
+
+function mapGasto(g: any): Gasto {
+  const fecha = g.fecha ? new Date(g.fecha) : null
+  const mes = fecha ? `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}` : ''
+  const tipoGuardado = typeof g.tipo === 'string' ? g.tipo.trim() : ''
+  return {
+    id: String(g._id),
+    mes,
+    tipoGasto: tipoGuardado || humanizeCategoria(g.categoria),
+    propiedad: g.propiedadId?.nombre || '',
+    monto: Number(g.monto || 0),
+    nota: g.nota || g.notas || '',
+    moneda: g.moneda === 'USD' ? 'USD' : 'ARS',
+  }
 }
 
 export default function GastosPage() {
@@ -20,6 +61,7 @@ export default function GastosPage() {
   const [loading, setLoading] = useState<boolean>(true)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editing, setEditing] = useState<Gasto | null>(null)
   const { setIsModalOpen: setGlobalModalOpen } = useModal()
   const [orderBy, setOrderBy] = useState<'mes' | 'costo'>('mes')
   const [openOrder, setOpenOrder] = useState(false)
@@ -61,19 +103,7 @@ export default function GastosPage() {
 
         const gastosJson = await resGastos.json()
         const list: any[] = Array.isArray(gastosJson?.gastos) ? gastosJson.gastos : []
-        const mapped: Gasto[] = list.map((g) => {
-          const fecha = g.fecha ? new Date(g.fecha) : null
-          const mes = fecha ? `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}` : ''
-          return {
-            id: String(g._id),
-            mes,
-            tipoGasto: humanizeCategoria(g.categoria),
-            propiedad: g.propiedadId?.nombre || '',
-            monto: Number(g.monto || 0),
-            nota: g.nota || '',
-          }
-        })
-        setGastos(sortGastos(mapped))
+        setGastos(sortGastos(list.map(mapGasto)))
       } catch (e) {
         setErrorMsg('No se pudieron cargar los gastos.')
         setGastos([])
@@ -98,90 +128,53 @@ export default function GastosPage() {
     return `${meses[parseInt(mesNum) - 1]} ${año}`
   }
 
-  const formatearMonto = (monto: number) => {
+  const formatearMonto = (monto: number, moneda: 'ARS' | 'USD' = 'ARS') => {
     return new Intl.NumberFormat('es-AR', {
       style: 'currency',
-      currency: 'ARS',
-      minimumFractionDigits: 0
+      currency: moneda,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
     }).format(monto)
   }
 
-  const humanizeCategoria = (c: string) => {
-    const x = (c || '').toLowerCase()
-    if (x === 'limpieza') return 'Limpieza'
-    if (x === 'mantenimiento') return 'Mantenimiento'
-    if (x === 'servicios') return 'Servicios'
-    if (x === 'impuestos') return 'Impuestos'
-    return 'Otros'
+  const cerrarModal = () => {
+    setIsModalOpen(false)
+    setEditing(null)
   }
 
-  const handleNuevoGasto = async (nuevoGasto: {
-    mes: string
-    tipoGasto: string
-    propiedad: string
-    monto: number
-    nota?: string
-    moneda: 'ARS' | 'USD'
-  }) => {
+  const handleGuardarGasto = async (form: GastoFormValues) => {
+    const editandoId = editing?.id
     try {
-      // Mapear tipo de gasto UI a categoría backend (tolerante a mayúsculas/acentos)
-      const mapCategoria = (t: string): 'limpieza'|'mantenimiento'|'servicios'|'impuestos'|'otros' => {
-        const norm = (s: string) =>
-          (s || '')
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .toLowerCase()
-            .trim()
-        const m = norm(t)
-        if (m.includes('limpieza')) return 'limpieza'                  // Producto Limpieza
-        if (m.includes('reparac') || m.includes('mantenimiento')) return 'mantenimiento'
-        if (m.includes('wifi') || m.includes('cable') || m.includes('servicio')) return 'servicios'
-        if (m.includes('impuesto')) return 'impuestos'
-        if (m.includes('comision') && m.includes('plataforma')) return 'servicios'
-        return 'otros'                                                 // publicidad, regalos, seguro, sueldo, cosas, etc.
-      }
-      const categoria = mapCategoria(nuevoGasto.tipoGasto)
-      const prop = propiedades.find(p => p.nombre === nuevoGasto.propiedad)
+      const categoria = mapCategoria(form.tipoGasto)
+      const prop = propiedades.find(p => p.nombre === form.propiedad)
       if (!prop) {
         setErrorMsg('Propiedad no encontrada. Actualizá la lista de propiedades.')
         return
       }
-      const [y, m] = nuevoGasto.mes.split('-').map(Number)
+      const [y, m] = form.mes.split('-').map(Number)
       const fecha = new Date(y, (m || 1) - 1, 1).toISOString()
       const payload = {
         propiedadId: prop.id,
         categoria,
+        tipo: form.tipoGasto,
         fecha,
-        monto: Number(nuevoGasto.monto || 0),
-        moneda: nuevoGasto.moneda || 'ARS',
-        nota: (nuevoGasto.nota || '').trim() || undefined,
-        notas: (nuevoGasto.nota || '').trim() || undefined,
+        monto: Number(form.monto || 0),
+        moneda: form.moneda || 'ARS',
+        nota: (form.nota || '').trim(),
       }
-      const res = await fetch('/api/gastos', {
-        method: 'POST',
+      const res = await fetch(editandoId ? `/api/gastos/${editandoId}` : '/api/gastos', {
+        method: editandoId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error(String(res.status))
-      // Refrescar lista
       const resList = await fetch('/api/gastos')
       const json = await resList.json()
       const list: any[] = Array.isArray(json?.gastos) ? json.gastos : []
-      const mapped: Gasto[] = list.map((g) => {
-        const f = g.fecha ? new Date(g.fecha) : null
-        const mes = f ? `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}` : ''
-        return {
-          id: String(g._id),
-          mes,
-          tipoGasto: humanizeCategoria(g.categoria),
-          propiedad: g.propiedadId?.nombre || '',
-          monto: Number(g.monto || 0),
-          nota: g.notas || g.nota || '',
-        }
-      })
-      setGastos(mapped)
+      setGastos(sortGastos(list.map(mapGasto)))
+      setErrorMsg(null)
     } catch (e) {
-      setErrorMsg('No se pudo guardar el gasto.')
+      setErrorMsg(editandoId ? 'No se pudo actualizar el gasto.' : 'No se pudo guardar el gasto.')
     }
   }
 
@@ -237,21 +230,36 @@ export default function GastosPage() {
               className="bg-zinc-900 rounded-xl border border-zinc-800 p-4"
             >
               {/* Mes y tipo de gasto */}
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-3 gap-2">
                 <div className="bg-zinc-800/60 border border-zinc-700 rounded-lg px-4 py-1.5">
                   <span className="text-xs font-medium text-zinc-200 capitalize">
                     {formatearMes(gasto.mes)}
                   </span>
                 </div>
-                <span className="text-sm font-medium text-zinc-400">
-                  {gasto.tipoGasto}
-                </span>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-sm font-medium text-zinc-400 truncate">
+                    {gasto.tipoGasto}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setErrorMsg(null)
+                      setEditing(gasto)
+                      setIsModalOpen(true)
+                    }}
+                    className="shrink-0 p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 transition-colors"
+                    title="Editar gasto"
+                    aria-label="Editar gasto"
+                  >
+                    <IoPencil className="text-white" />
+                  </button>
+                </div>
               </div>
 
               {/* Propiedad y monto (minimalista) alineados con el chip del mes */}
               <div className="pl-4 flex items-center justify-between">
                 <h3 className="text-base font-semibold text-white truncate pr-3">{gasto.propiedad}</h3>
-                <p className="text-md font-bold text-red-400">{formatearMonto(gasto.monto)}</p>
+                <p className="text-md font-bold text-red-400">{formatearMonto(gasto.monto, gasto.moneda)}</p>
               </div>
 
               {/* Nota (si existe) alineada con el chip del mes */}
@@ -266,7 +274,10 @@ export default function GastosPage() {
 
       {/* Botón flotante de agregar */}
       <button
-        onClick={() => setIsModalOpen(true)}
+        onClick={() => {
+          setEditing(null)
+          setIsModalOpen(true)
+        }}
         className="fixed bottom-20 right-4 md:bottom-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-blue-700 transition-colors z-[80]"
       >
         <IoAdd className="text-3xl" />
@@ -274,10 +285,20 @@ export default function GastosPage() {
 
       {/* Modal de nuevo gasto */}
       <GastoModal
+        key={editing?.id || 'nuevo'}
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleNuevoGasto}
+        onClose={cerrarModal}
+        onSubmit={handleGuardarGasto}
         propertyNames={propiedades.map(p => p.nombre)}
+        mode={editing ? 'edit' : 'create'}
+        initial={editing ? {
+          mes: editing.mes,
+          tipoGasto: editing.tipoGasto,
+          propiedad: editing.propiedad,
+          monto: editing.monto,
+          nota: editing.nota,
+          moneda: editing.moneda,
+        } : undefined}
       />
     </main>
   )

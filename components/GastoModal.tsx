@@ -4,27 +4,38 @@ import { useState, useEffect, useRef } from 'react'
 import { IoClose, IoChevronDown, IoRefreshOutline } from 'react-icons/io5'
 import { z } from 'zod'
 
+export interface GastoFormValues {
+  mes: string
+  tipoGasto: string
+  propiedad: string
+  monto: number
+  nota?: string
+  moneda: 'ARS' | 'USD'
+}
+
 interface GastoModalProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (gasto: {
-    mes: string
-    tipoGasto: string
-    propiedad: string
-    monto: number
-    nota?: string
-    moneda: 'ARS' | 'USD'
-  }) => void
+  onSubmit: (gasto: GastoFormValues) => void
   propertyNames?: string[]
+  mode?: 'create' | 'edit'
+  initial?: Partial<GastoFormValues>
 }
 
-export default function GastoModal({ isOpen, onClose, onSubmit, propertyNames = [] }: GastoModalProps) {
-  const [mes, setMes] = useState('')
-  const [tipoGasto, setTipoGasto] = useState('')
-  const [propiedad, setPropiedad] = useState('')
-  const [monto, setMonto] = useState('')
-  const [nota, setNota] = useState('')
-  const [moneda, setMoneda] = useState<'ARS' | 'USD'>('ARS')
+export default function GastoModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  propertyNames = [],
+  mode = 'create',
+  initial,
+}: GastoModalProps) {
+  const [mes, setMes] = useState(initial?.mes || '')
+  const [tipoGasto, setTipoGasto] = useState(initial?.tipoGasto || '')
+  const [propiedad, setPropiedad] = useState(initial?.propiedad || '')
+  const [monto, setMonto] = useState(initial?.monto != null && !Number.isNaN(initial.monto) ? String(initial.monto) : '')
+  const [nota, setNota] = useState(initial?.nota || '')
+  const [moneda, setMoneda] = useState<'ARS' | 'USD'>(initial?.moneda === 'USD' ? 'USD' : 'ARS')
 
   const [errors, setErrors] = useState<Partial<Record<'mes' | 'tipoGasto' | 'propiedad' | 'monto', string>>>({})
   const [touched, setTouched] = useState<Partial<Record<'mes' | 'tipoGasto' | 'propiedad' | 'monto', boolean>>>({})
@@ -42,9 +53,16 @@ export default function GastoModal({ isOpen, onClose, onSubmit, propertyNames = 
   const containerRef = useRef<HTMLDivElement | null>(null)
 
   const now = new Date()
-  const [mesPickerYear, setMesPickerYear] = useState<number>(now.getFullYear())
+  const anioInicial = (() => {
+    if (initial?.mes) {
+      const y = parseInt(initial.mes.split('-')[0], 10)
+      if (!Number.isNaN(y) && y > 0) return y
+    }
+    return now.getFullYear()
+  })()
+  const [mesPickerYear, setMesPickerYear] = useState<number>(anioInicial)
 
-  const TIPO_OPCIONES = [
+  const TIPO_OPCIONES_BASE = [
     'Comisión Plataforma',
     'Publicidad',
     'Producto Limpieza',
@@ -57,8 +75,11 @@ export default function GastoModal({ isOpen, onClose, onSubmit, propertyNames = 
     'Otros',
     'Cosas'
   ]
+  const TIPO_OPCIONES = tipoGasto && !TIPO_OPCIONES_BASE.includes(tipoGasto)
+    ? [tipoGasto, ...TIPO_OPCIONES_BASE]
+    : TIPO_OPCIONES_BASE
 
-  const PROPIEDAD_OPCIONES = propertyNames.length > 0
+  const propiedadesBase = propertyNames.length > 0
     ? propertyNames
     : [
         'Ayres de Güemes',
@@ -68,6 +89,9 @@ export default function GastoModal({ isOpen, onClose, onSubmit, propertyNames = 
         'Hermosas vistas, cálido y luminoso',
         'Lo de Vicente'
       ]
+  const PROPIEDAD_OPCIONES = propiedad && !propiedadesBase.includes(propiedad)
+    ? [propiedad, ...propiedadesBase]
+    : propiedadesBase
 
   const NOMBRES_MESES_CORTOS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
   const pad2 = (n: number) => String(n).padStart(2, '0')
@@ -132,12 +156,26 @@ export default function GastoModal({ isOpen, onClose, onSubmit, propertyNames = 
   }
 
   const handleReset = () => {
-    setMes('')
-    setTipoGasto('')
-    setPropiedad('')
-    setMonto('')
-    setNota('')
-    setMoneda('ARS')
+    if (mode === 'edit') {
+      setMes(initial?.mes || '')
+      setTipoGasto(initial?.tipoGasto || '')
+      setPropiedad(initial?.propiedad || '')
+      setMonto(initial?.monto != null && !Number.isNaN(initial.monto) ? String(initial.monto) : '')
+      setNota(initial?.nota || '')
+      setMoneda(initial?.moneda === 'USD' ? 'USD' : 'ARS')
+      if (initial?.mes) {
+        const y = parseInt(initial.mes.split('-')[0], 10)
+        if (!Number.isNaN(y) && y > 0) setMesPickerYear(y)
+      }
+    } else {
+      setMes('')
+      setTipoGasto('')
+      setPropiedad('')
+      setMonto('')
+      setNota('')
+      setMoneda('ARS')
+      setMesPickerYear(now.getFullYear())
+    }
     setErrors({})
     setTouched({})
   }
@@ -149,13 +187,13 @@ export default function GastoModal({ isOpen, onClose, onSubmit, propertyNames = 
       <div ref={containerRef} className="bg-gray-900 w-full md:max-w-md md:rounded-lg rounded-t-2xl max-h-[85vh] md:max-h-[90vh] overflow-y-auto shadow-2xl animate-slide-up">
         {/* Header */}
         <div className="sticky top-0 bg-gray-900 border-b border-gray-800 px-6 py-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-white">Nuevo Gasto</h2>
+          <h2 className="text-xl font-semibold text-white">{mode === 'edit' ? 'Editar gasto' : 'Nuevo Gasto'}</h2>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleReset}
               className="p-2 hover:bg-gray-800 rounded-full transition-colors"
-              title="Limpiar formulario"
+              title={mode === 'edit' ? 'Restaurar datos' : 'Limpiar formulario'}
             >
               <IoRefreshOutline className="text-2xl text-white" />
             </button>
@@ -369,7 +407,7 @@ export default function GastoModal({ isOpen, onClose, onSubmit, propertyNames = 
               type="submit"
               className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20"
             >
-              Agregar Gasto
+              {mode === 'edit' ? 'Guardar cambios' : 'Agregar Gasto'}
             </button>
           </div>
         </form>

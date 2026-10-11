@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
       nota: g.nota || g.descripcion || '',
       proveedor: g.proveedor || '',
       createdAt: g.createdAt?.toISOString(),
+      tipo: g.tipo || '',
     }));
 
     const csv = toCsv(rows);

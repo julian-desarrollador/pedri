@@ -45,11 +45,13 @@ export async function POST(request: NextRequest) {
     await dbConnect();
     const data = await request.json();
 
-    // Compat: aceptar 'notas' (plural) o 'nota' (singular) desde el cliente
-    const { notas, nota, ...rest } = data || {};
+    // Compat: aceptar 'notas' (plural) o 'nota' (singular) desde el cliente.
+    // `tipo` es la etiqueta de la UI (Wifi, Sueldo, etc.) para poder reeditarla.
+    const { notas, nota, tipo, ...rest } = data || {};
     const payload: any = { ...rest };
-    if (nota != null && String(nota).length) payload.nota = nota;
-    else if (notas != null && String(notas).length) payload.nota = notas;
+    if (nota != null && String(nota).length) payload.nota = String(nota).trim();
+    else if (notas != null && String(notas).length) payload.nota = String(notas).trim();
+    if (tipo != null && String(tipo).trim()) payload.tipo = String(tipo).trim();
 
     const gasto = await Gasto.create(payload);
 

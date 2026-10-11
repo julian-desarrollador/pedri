@@ -6,6 +6,8 @@ export interface IGasto extends Document {
   fecha: Date;
   monto: number;
   moneda: 'ARS' | 'USD';
+  /** Etiqueta elegida en la UI (Wifi, Cable, Sueldo, etc.). La categoría sigue siendo el agrupador. */
+  tipo?: string;
   nota?: string;
   descripcion?: string;
   proveedor?: string;
@@ -39,6 +41,10 @@ const GastoSchema = new Schema<IGasto>(
       enum: ['ARS', 'USD'],
       required: [true, 'La moneda es requerida'],
     },
+    tipo: {
+      type: String,
+      trim: true,
+    },
     nota: {
       type: String,
     },
@@ -57,8 +63,16 @@ const GastoSchema = new Schema<IGasto>(
 // Índice para listados y análisis por propiedad y fecha
 GastoSchema.index({ propiedadId: 1, fecha: -1 });
 
+// En desarrollo, Next puede conservar un modelo compilado con el schema viejo
+// y descartar campos nuevos (como `tipo`).
+const MODEL_NAME = 'Gasto';
+if (process.env.NODE_ENV === 'development' && mongoose.models[MODEL_NAME]) {
+  delete mongoose.models[MODEL_NAME];
+}
+
 const Gasto: Model<IGasto> =
-  mongoose.models.Gasto || mongoose.model<IGasto>('Gasto', GastoSchema);
+  (mongoose.models[MODEL_NAME] as Model<IGasto>) ||
+  mongoose.model<IGasto>(MODEL_NAME, GastoSchema);
 
 export default Gasto;
 

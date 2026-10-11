@@ -35,10 +35,17 @@ export async function PUT(
     await dbConnect();
     const data = await request.json();
 
-    const gasto = await Gasto.findByIdAndUpdate(params.id, data, {
+    // Misma forma que el alta: nota/notas y la etiqueta `tipo` de la UI.
+    const { notas, nota, tipo, ...rest } = data || {};
+    const payload: any = { ...rest };
+    if (nota != null) payload.nota = String(nota).trim();
+    else if (notas != null) payload.nota = String(notas).trim();
+    if (tipo != null && String(tipo).trim()) payload.tipo = String(tipo).trim();
+
+    const gasto = await Gasto.findByIdAndUpdate(params.id, payload, {
       new: true,
       runValidators: true,
-    });
+    }).populate('propiedadId', 'nombre');
 
     if (!gasto) {
       return NextResponse.json({ error: 'Gasto no encontrado' }, { status: 404 });
